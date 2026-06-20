@@ -99,9 +99,11 @@ npm-debug.log
 yarn-error.log
 
 # Environment files
-.env
 .env.local
 .env.*.local
+
+# Appsettings files
+appsettings.folder.json
 
 # OS generated files
 .DS_Store
