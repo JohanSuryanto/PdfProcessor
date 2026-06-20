@@ -7,7 +7,8 @@ public static class ApiRoutes
     public const string PdfUpload = "pdf/upload";
     public const string PdfProcess = "pdf/process";
     public const string PdfStatus = "pdf/status/{id}";
-    
+
     // Future routes can be added here
+    // public const string SomeOtherRoute = "some/other/route";
     // public const string SomeOtherRoute = "some/other/route";
 }
