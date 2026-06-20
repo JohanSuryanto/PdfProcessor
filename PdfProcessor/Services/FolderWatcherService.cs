@@ -8,18 +8,22 @@ public class FolderWatcherService
     private readonly PdfProcessorService _pdfProcessorService;
     private readonly ApiService _apiService;
     private readonly int _pollingIntervalSeconds;
+    private readonly string _scheduleMode;
+    private readonly TimeSpan _specificTime;
     private readonly HashSet<string> _processedFiles;
     private System.Threading.Timer? _pollingTimer;
     private System.Threading.Timer? _debounceTimer;
     private readonly object _lock = new object();
     private bool _isProcessing = false;
 
-    public FolderWatcherService(string folderPath, PdfProcessorService pdfProcessorService, ApiService apiService, int pollingIntervalSeconds = 60)
+    public FolderWatcherService(string folderPath, PdfProcessorService pdfProcessorService, ApiService apiService, int pollingIntervalSeconds = 60, string scheduleMode = "INTERVAL", string specificTime = "00:00:00")
     {
         _folderPath = folderPath;
         _pdfProcessorService = pdfProcessorService;
         _apiService = apiService;
         _pollingIntervalSeconds = pollingIntervalSeconds;
+        _scheduleMode = scheduleMode;
+        _specificTime = TimeSpan.TryParse(specificTime, out var time) ? time : TimeSpan.Zero;
         _processedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Ensure the folder exists
@@ -32,18 +36,38 @@ public class FolderWatcherService
     public void Start()
     {
         Console.WriteLine($"Watching folder: {_folderPath}");
-        Console.WriteLine($"Polling interval: {_pollingIntervalSeconds} seconds");
+        
+        if (_scheduleMode == "SPECIFIC_TIME")
+        {
+            Console.WriteLine($"Schedule mode: Specific Time at {_specificTime:hh\\:mm\\:ss}");
+        }
+        else
+        {
+            Console.WriteLine($"Schedule mode: Interval ({_pollingIntervalSeconds} seconds)");
+        }
+        
         Console.WriteLine("Press Ctrl+C to stop...");
 
-        // Process existing files on startup
-        Task.Run(async () => await CheckForNewFiles());
+        // Process existing files on startup only for interval mode
+        if (_scheduleMode != "SPECIFIC_TIME")
+        {
+            Task.Run(async () => await CheckForNewFiles());
+        }
 
-        // Start polling timer
-        _pollingTimer = new System.Threading.Timer(
-            async _ => await CheckForNewFiles(),
-            null,
-            _pollingIntervalSeconds * 1000,
-            _pollingIntervalSeconds * 1000);
+        // Start timer based on schedule mode
+        if (_scheduleMode == "SPECIFIC_TIME")
+        {
+            ScheduleSpecificTime();
+        }
+        else
+        {
+            // Start polling timer for interval mode
+            _pollingTimer = new System.Threading.Timer(
+                async _ => await CheckForNewFiles(),
+                null,
+                _pollingIntervalSeconds * 1000,
+                _pollingIntervalSeconds * 1000);
+        }
     }
 
     private async Task CheckForNewFiles()
@@ -158,6 +182,33 @@ public class FolderWatcherService
                 Thread.Sleep(retryDelayMs);
             }
         }
+    }
+
+    private void ScheduleSpecificTime()
+    {
+        var now = DateTime.Now;
+        var scheduledTime = DateTime.Today.Add(_specificTime);
+        
+        // If the scheduled time has already passed today, schedule for tomorrow
+        if (now > scheduledTime)
+        {
+            scheduledTime = scheduledTime.AddDays(1);
+        }
+        
+        var delay = (scheduledTime - now).TotalMilliseconds;
+        
+        Console.WriteLine($"Next run scheduled for: {scheduledTime:yyyy-MM-dd HH:mm:ss}");
+        
+        _pollingTimer = new System.Threading.Timer(
+            async _ => 
+            {
+                await CheckForNewFiles();
+                // Reschedule for next day
+                ScheduleSpecificTime();
+            },
+            null,
+            (long)delay,
+            System.Threading.Timeout.Infinite);
     }
 
     public void Stop()

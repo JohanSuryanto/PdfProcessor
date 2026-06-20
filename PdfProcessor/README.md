@@ -5,12 +5,13 @@ A .NET 8 Console Application that monitors a local folder for PDF files, process
 ## Overview
 
 The PDF Processor is a service-oriented application that:
-- Monitors an `Input` folder for PDF files using configurable polling
+- Monitors an `Input` folder for PDF files using configurable scheduling
 - Sends PDF notifications to a configurable API endpoint
 - Deletes files on successful API response
 - Moves failed files to a `Failed` folder with GUID-based naming
 - Tracks and reports success/failed statistics
-- Supports configurable polling intervals (e.g., 10s, 30s, 60s)
+- Supports interval-based polling or specific daily time scheduling
+- Includes a system tray with GUI settings configuration
 
 ## Quick Start
 
@@ -67,6 +68,13 @@ For detailed setup instructions, see [SETUP.md](SETUP.md).
 - Debounced summary display (3-second delay)
 - Per-batch statistics with counter reset
 
+### Phase 6: System Tray and GUI
+- System tray icon with context menu
+- Settings dialog with folder browsing
+- Schedule mode configuration (Interval/Specific Time)
+- Automatic folder watcher restart on settings change
+- Console window toggle
+
 ## Technology Stack
 
 - .NET 8 Console Application
@@ -87,6 +95,7 @@ PdfProcessor/
 │   ├── ApiService.cs
 │   ├── FolderWatcherService.cs
 │   └── PdfProcessorService.cs
+├── icon.ico            # Application icon
 ├── appsettings.json    # Configuration file
 ├── Program.cs          # Application entry point
 └── PdfProcessor.csproj # Project file
@@ -94,39 +103,38 @@ PdfProcessor/
 
 ## Configuration
 
-Edit `appsettings.json` to configure API and polling settings:
+Edit `appsettings.json` to configure API settings:
 
 ```json
 {
   "ApiSettings": {
     "BaseUrl": "https://localhost:5000/api",
     "Endpoint": "pdfnotifications"
-  },
-  "PollingSettings": {
-    "IntervalSeconds": 60
   }
 }
 ```
 
-Edit `.env` file to configure folder paths (recommended method):
+Edit `.env` file to configure all settings (recommended method):
 
 ```env
 PUBLIC_FOLDER_URL=Input
 FAILED_FOLDER_URL=Failed
+SCHEDULE_MODE=INTERVAL
+POLLING_INTERVAL_SECONDS=60
+SPECIFIC_TIME=00:00:00
 ```
 
 **Note**: You can paste Windows paths directly with single backslashes - no escaping needed.
 
-For backward compatibility, you can also use `appsettings.folder.json`:
+**Schedule Modes**:
+- `INTERVAL` - Polls at regular intervals (default). Scans for files on startup and at each interval.
+- `SPECIFIC_TIME` - Runs once daily at the specified time (24-hour format). Skips initial scan on startup, only runs at the scheduled time.
 
-```json
-{
-  "FolderPaths": {
-    "InputFolder": "Input",
-    "FailedFolder": "Failed"
-  }
-}
-```
+**Using the Settings GUI**:
+- Right-click the system tray icon
+- Select "Settings" to configure folder paths, schedule mode, and polling interval
+- Changes take effect immediately
+- Input and Failed folders cannot be the same (prevents infinite processing loops)
 
 See [SETUP.md](SETUP.md) for detailed configuration options.
 

@@ -417,6 +417,7 @@ PdfProcessor/
 │   ├── ApiService.cs              # API communication
 │   ├── FolderWatcherService.cs   # Folder monitoring
 │   └── PdfProcessorService.cs    # Processing coordination
+├── icon.ico            # Application icon
 ├── appsettings.json    # Configuration file
 ├── Program.cs          # Application entry point
 └── PdfProcessor.csproj # Project file

@@ -48,30 +48,34 @@ dotnet run --configuration Release
 
 ### appsettings.json
 
-The application uses `appsettings.json` for API and polling configuration:
+The application uses `appsettings.json` for API configuration:
 
 ```json
 {
   "ApiSettings": {
     "BaseUrl": "https://localhost:5000/api",
     "Endpoint": "pdfnotifications"
-  },
-  "PollingSettings": {
-    "IntervalSeconds": 60
   }
 }
 ```
 
 ### .env File
 
-The application uses `.env` file for folder path configuration. This is the recommended method as it doesn't require JSON escaping:
+The application uses `.env` file for all configuration (folder paths, polling, and scheduling). This is the recommended method as it doesn't require JSON escaping:
 
 ```env
 PUBLIC_FOLDER_URL=C:\Users\YourName\Desktop\PdfFolder\Input
 FAILED_FOLDER_URL=C:\Users\YourName\Desktop\PdfFolder\Failed
+SCHEDULE_MODE=INTERVAL
+POLLING_INTERVAL_SECONDS=60
+SPECIFIC_TIME=00:00:00
 ```
 
 **Note**: You can paste Windows paths directly with single backslashes - no escaping needed.
+
+**Schedule Modes**:
+- `INTERVAL` - Polls at regular intervals (default). Scans for files on startup and at each interval.
+- `SPECIFIC_TIME` - Runs once daily at the specified time (24-hour format). Skips initial scan on startup, only runs at the scheduled time.
 
 ### appsettings.folder.json (Legacy)
 
@@ -92,8 +96,10 @@ The application still supports `appsettings.folder.json` for backward compatibil
 - **BaseUrl**: The base URL of your API endpoint
 - **Endpoint**: The specific route for PDF notifications
 
-#### Polling Settings
-- **IntervalSeconds**: Polling interval in seconds (default: 60, configurable: 10, 30, 60, 90, etc.)
+#### Schedule Settings (.env)
+- **SCHEDULE_MODE**: Schedule mode - `INTERVAL` or `SPECIFIC_TIME` (default: INTERVAL)
+- **POLLING_INTERVAL_SECONDS**: Polling interval in seconds when using INTERVAL mode (default: 60)
+- **SPECIFIC_TIME**: Specific time to run daily when using SPECIFIC_TIME mode, format: HH:mm:ss (default: 00:00:00)
 
 #### Folder Path Settings (.env)
 - **PUBLIC_FOLDER_URL**: Path to the Input folder (supports relative or absolute paths)
@@ -106,21 +112,27 @@ The application still supports `appsettings.folder.json` for backward compatibil
 ### Configuration Loading
 
 The application loads configuration in the following priority order:
-1. `.env` file in the project root (folder paths - highest priority)
-2. `appsettings.json` in the project root (API & polling settings)
+1. `.env` file in the project root (all settings - highest priority)
+2. `appsettings.json` in the project root (API settings only)
 3. `appsettings.folder.json` in the project root (folder paths - fallback)
-4. Default values (Input/Failed folders)
+4. Default values (Input/Failed folders, INTERVAL mode, 60 seconds)
 
 Files are copied to output directory on build (PreserveNewest). Configuration is loaded at application startup.
 
 ### Updating Configuration
 
-**For folder paths (.env file)**:
+**Using the Settings GUI (Recommended)**:
+1. Right-click the system tray icon
+2. Select "Settings"
+3. Configure folder paths, schedule mode, and polling interval
+4. Click "Save" - the folder watcher automatically restarts with new settings
+
+**Manual Configuration (.env file)**:
 1. Edit `.env` file in the project root
 2. No rebuild required - just restart the application
 3. Paste Windows paths directly with single backslashes
 
-**For API and polling settings**:
+**For API settings**:
 1. Edit `appsettings.json` in the project root
 2. Rebuild the application: `dotnet build`
 3. Restart the application for changes to take effect
@@ -181,6 +193,7 @@ The application automatically creates the following folders:
 PdfProcessor/
 ├── Input/              # Monitored folder for PDF files
 ├── Failed/             # Failed PDF files moved here
+├── icon.ico            # Application icon
 ├── bin/                # Build output
 └── obj/                # Build intermediates
 ```
@@ -267,6 +280,20 @@ The `PdfProcessor.csproj` file contains:
   </ItemGroup>
 </Project>
 ```
+
+## System Tray
+
+The application runs in the system tray with the following options:
+
+- **Show Console** - Toggle the console window visibility
+- **Settings** - Open the Settings dialog to configure:
+  - Input folder path (with Browse button)
+  - Failed folder path (with Browse button)
+  - Schedule mode (Interval or Specific Time)
+  - Polling interval (seconds) or specific time (24-hour format)
+- **Exit** - Stop the application
+
+Settings changes take effect immediately - the folder watcher restarts automatically.
 
 ## Known Limitations
 
