@@ -2,7 +2,11 @@
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using PdfProcessor.Services;
+using PdfProcessor.Services.Ocr;
+using PdfProcessor.Options;
 using System.Runtime.CompilerServices;
 using DotNetEnv;
 
@@ -60,6 +64,7 @@ namespace PdfProcessor
         private static int _pollingIntervalSeconds;
         private static string _scheduleMode = "INTERVAL";
         private static string _specificTime = "00:00:00";
+        private static IServiceProvider? _serviceProvider;
 
         [STAThread]
         static void Main()
@@ -98,6 +103,17 @@ namespace PdfProcessor
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                 .Build();
 
+            // Set up dependency injection
+            var services = new ServiceCollection();
+            services.Configure<OcrToolOptions>(configuration.GetSection(OcrToolOptions.SectionName));
+            services.AddSingleton<ICommandRunner, CommandRunner>();
+            services.AddSingleton<IPdfTextExtractor, PdfTextExtractor>();
+            services.AddSingleton<IPdfPageRenderer, PdfPageRenderer>();
+            services.AddSingleton<IOcrEngine, TesseractOcrEngine>();
+            services.AddSingleton<IKkParser, KkParser>();
+            services.AddSingleton<IKkExtractionService, KkExtractionService>();
+            _serviceProvider = services.BuildServiceProvider();
+
             // Get folder paths from .env file (fallback to JSON config or defaults)
             var inputFolderConfig = Env.GetString("PUBLIC_FOLDER_URL") 
                 ?? configuration["FolderPaths:InputFolder"] 
@@ -133,7 +149,8 @@ namespace PdfProcessor
             var httpClient = new HttpClient();
             var apiBaseUrl = configuration["ApiSettings:BaseUrl"] ?? "https://localhost:5000/api";
             var apiService = new ApiService(httpClient, apiBaseUrl, failedFolderPath);
-            var pdfProcessorService = new PdfProcessorService(apiService);
+            var kkExtractionService = _serviceProvider.GetRequiredService<IKkExtractionService>();
+            var pdfProcessorService = new PdfProcessorService(apiService, kkExtractionService);
             _folderWatcherService = new FolderWatcherService(inputFolderPath, pdfProcessorService, apiService, _pollingIntervalSeconds, _scheduleMode, _specificTime);
 
             // Start the folder watcher
@@ -268,6 +285,17 @@ namespace PdfProcessor
                     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                     .Build();
 
+                // Rebuild service provider
+                var services = new ServiceCollection();
+                services.Configure<OcrToolOptions>(configuration.GetSection(OcrToolOptions.SectionName));
+                services.AddSingleton<ICommandRunner, CommandRunner>();
+                services.AddSingleton<IPdfTextExtractor, PdfTextExtractor>();
+                services.AddSingleton<IPdfPageRenderer, PdfPageRenderer>();
+                services.AddSingleton<IOcrEngine, TesseractOcrEngine>();
+                services.AddSingleton<IKkParser, KkParser>();
+                services.AddSingleton<IKkExtractionService, KkExtractionService>();
+                _serviceProvider = services.BuildServiceProvider();
+
                 // Reload .env file
                 try
                 {
@@ -317,7 +345,8 @@ namespace PdfProcessor
                     var httpClient = new HttpClient();
                     var apiBaseUrl = configuration["ApiSettings:BaseUrl"] ?? "https://localhost:5000/api";
                     var apiService = new ApiService(httpClient, apiBaseUrl, failedFolderPath);
-                    var pdfProcessorService = new PdfProcessorService(apiService);
+                    var kkExtractionService = _serviceProvider.GetRequiredService<IKkExtractionService>();
+                    var pdfProcessorService = new PdfProcessorService(apiService, kkExtractionService);
 
                     _folderWatcherService = new FolderWatcherService(inputFolderPath, pdfProcessorService, apiService, _pollingIntervalSeconds, _scheduleMode, _specificTime);
                     _folderWatcherService.Start();

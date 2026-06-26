@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using PdfProcessor.Routes;
+using PdfProcessor.Contracts;
 
 namespace PdfProcessor.Services;
 
@@ -37,7 +38,7 @@ public class ApiService
         return Path.Combine(folderPath, newFileName);
     }
 
-    public async Task SendPdfNotification(string fileName, string filePath)
+    public async Task SendPdfNotification(string fileName, string filePath, KkExtractionResponse? extractionResult = null)
     {
         var apiUrl = $"{_apiBaseUrl}/{ApiRoutes.PdfUpload}";
 
@@ -49,7 +50,8 @@ public class ApiService
             {
                 FileName = fileName,
                 FilePath = filePath,
-                DetectedAt = DateTime.UtcNow
+                DetectedAt = DateTime.UtcNow,
+                ExtractionData = extractionResult
             };
 
             var json = JsonSerializer.Serialize(payload);
