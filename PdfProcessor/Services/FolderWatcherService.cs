@@ -1,4 +1,6 @@
 using System.IO;
+using System.Text.Json;
+using PdfProcessor.Contracts;
 
 namespace PdfProcessor.Services;
 
@@ -111,20 +113,52 @@ public class FolderWatcherService
             {
                 Console.WriteLine($"Found {newFiles.Count} new PDF file(s) to process");
 
+                var batchResults = new List<(string FileName, KkExtractionResponse? Result)>();
+
                 foreach (var file in newFiles)
                 {
                     // Wait for file to be fully copied before processing
                     WaitForFileReady(file);
 
-                    // Process the PDF file
-                    await _pdfProcessorService.ProcessPdf(file);
-
-                    // Remove from processed set after processing (file has been moved/deleted)
-                    lock (_lock)
+                    try
                     {
-                        _processedFiles.Remove(file);
+                        // Process the PDF file
+                        var result = await _pdfProcessorService.ProcessPdf(file);
+                        batchResults.Add((Path.GetFileName(file), result));
+
+                        // Delete the file after successful processing
+                        File.Delete(file);
+                        Console.WriteLine($"Deleted: {Path.GetFileName(file)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to process {Path.GetFileName(file)}: {ex.Message}");
+
+                        // Move failed file to the Failed folder
+                        try
+                        {
+                            var failedFileName = $"{Path.GetFileNameWithoutExtension(file)}_{Guid.NewGuid().ToString("N").Substring(0, 8)}{Path.GetExtension(file)}";
+                            var failedFilePath = Path.Combine(_apiService.FailedFolderPath, failedFileName);
+                            File.Move(file, failedFilePath);
+                            Console.WriteLine($"Moved to Failed folder: {failedFileName}");
+                        }
+                        catch (Exception moveEx)
+                        {
+                            Console.WriteLine($"Error moving file to Failed folder: {moveEx.Message}");
+                        }
+                    }
+                    finally
+                    {
+                        // Remove from processed set
+                        lock (_lock)
+                        {
+                            _processedFiles.Remove(file);
+                        }
                     }
                 }
+
+                // Write batch results to PROCESSED FILES folder
+                WriteBatchResultsToFile(batchResults);
 
                 // Reset debounce timer to show summary after 3 seconds of inactivity
                 _debounceTimer?.Dispose();
@@ -141,6 +175,44 @@ public class FolderWatcherService
             {
                 _isProcessing = false;
             }
+        }
+    }
+
+    private void WriteBatchResultsToFile(List<(string FileName, KkExtractionResponse? Result)> batchResults)
+    {
+        try
+        {
+            var outputFolder = Path.Combine(_folderPath, "RESULTS");
+            if (!Directory.Exists(outputFolder))
+            {
+                Directory.CreateDirectory(outputFolder);
+            }
+
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var outputFilePath = Path.Combine(outputFolder, $"PROCESSED_DATA_{timestamp}.txt");
+
+            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+            using var writer = new StreamWriter(outputFilePath, append: false, System.Text.Encoding.UTF8);
+
+            writer.WriteLine($"Processed at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            writer.WriteLine($"Total files: {batchResults.Count}");
+
+            for (int i = 0; i < batchResults.Count; i++)
+            {
+                writer.WriteLine($"[{i + 1}] {batchResults[i].FileName}");
+            }
+
+            writer.WriteLine(new string('-', 60));
+            writer.WriteLine();
+
+            var resultList = batchResults.Select(r => r.Result).ToList();
+            writer.WriteLine(JsonSerializer.Serialize(resultList, jsonOptions));
+
+            Console.WriteLine($"Batch results written to: {outputFilePath}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error writing batch results to file: {ex.Message}");
         }
     }
 

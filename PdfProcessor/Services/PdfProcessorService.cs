@@ -16,7 +16,7 @@ public class PdfProcessorService
         _kkExtractionService = kkExtractionService;
     }
 
-    public async Task ProcessPdf(string filePath)
+    public async Task<KkExtractionResponse?> ProcessPdf(string filePath)
     {
         var fileName = Path.GetFileName(filePath);
         Console.WriteLine($"Detected PDF: {fileName}");
@@ -30,12 +30,9 @@ public class PdfProcessorService
             extractionResult = await _kkExtractionService.ExtractAsync(fileStream, fileName, CancellationToken.None);
         }
 
-        // Output extraction result as JSON
-        var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-        Console.WriteLine(JsonSerializer.Serialize(extractionResult, jsonOptions));
-
         // Send notification to API with extraction data
-        await _apiService.SendPdfNotification(fileName, filePath, extractionResult);
+        //await _apiService.SendPdfNotification(fileName, filePath, extractionResult);
 
+        return extractionResult;
     }
 }

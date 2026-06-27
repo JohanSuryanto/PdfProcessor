@@ -12,6 +12,7 @@ public class ApiService
     private readonly string _failedFolderPath;
     public int FailedCount { get; private set; }
     public int SuccessCount { get; private set; }
+    public string FailedFolderPath => _failedFolderPath;
 
     public ApiService(HttpClient httpClient, string apiBaseUrl = "https://localhost:5000/api", string failedFolderPath = "Failed")
     {

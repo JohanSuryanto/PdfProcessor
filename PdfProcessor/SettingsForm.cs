@@ -32,7 +32,7 @@ namespace PdfProcessor
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.StartPosition = FormStartPosition.CenterParent;
+            this.StartPosition = FormStartPosition.CenterScreen;
             this.ClientSize = new Size(500, 350);
 
             // Input Folder Label
